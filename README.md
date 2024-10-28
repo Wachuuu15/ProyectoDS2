@@ -27,24 +27,6 @@ Los datos de este proyecto provienen de un conjunto de imágenes TC y sus corres
 
 - **sample_submission.csv**: Un archivo de ejemplo que muestra el formato esperado para las predicciones.
 
-## Evaluación
-
-El desempeño del modelo se evalúa utilizando una métrica de **pérdida logarítmica ponderada**. La fórmula utilizada es:
-
-$$
-L_{ij} = - w_j \left( y_{ij} \log(p_{ij}) + (1 - y_{ij}) \log(1 - p_{ij}) \right)
-$$
-
-Donde:
-- \( y_{ij} \) es la etiqueta verdadera (1 si hay fractura, 0 si no).
-- \( p_{ij} \) es la probabilidad predicha de fractura.
-- \( w_j \) es el peso asignado a cada tipo de predicción.
-
-Los pesos son los siguientes:
-- **Fractura negativa en una vértebra**: Peso de 1.
-- **Fractura positiva en una vértebra**: Peso de 2.
-- **Sin fractura en el paciente (global)**: Peso de 7.
-- **Fractura positiva en el paciente (global)**: Peso de 14.
 
 ## Requisitos
 
