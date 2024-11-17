@@ -58,3 +58,6 @@ Para ejecutar este proyecto, necesitarás instalar las siguientes librerías:
 - scikit-learn
 - tensorflow 
 
+## Dependencias para venv 
+```pip install -r requirements.txt```
+
