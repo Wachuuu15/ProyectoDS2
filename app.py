@@ -126,9 +126,28 @@ with col1:
 
 with col2:
     if uploaded_file is not None:
+        # Usar un contenedor centrado
+        st.markdown(
+            """
+            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;">
+            """,
+            unsafe_allow_html=True,
+        )
+        
         if st.button('Predecir'):
             processed_image = preprocess_image(image)
             prediction = model.predict(processed_image)
-            st.write("Predicciones por vértebra (C1-C7):")
-            for i, prob in enumerate(prediction[0]):
-                st.write(f"C{i+1}: {prob:.4f}")
+            
+            probabilities = prediction[0]
+            threshold = 1e-4
+            
+            if all(prob <= threshold for prob in probabilities):
+                st.markdown("### No hay fracturas detectadas.")
+            else:
+                st.markdown("### Probabilidad de fracturas detectadas:")
+                for i, prob in enumerate(probabilities):
+                    if prob > threshold:
+                        st.markdown(f"- **C{i+1}**: {prob:.4f}")
+        
+        st.markdown("</div>", unsafe_allow_html=True)
+
