@@ -125,7 +125,7 @@ st.markdown('<p class="title">Detección de Fracturas Cervicales</p>', unsafe_al
 st.markdown('<p class="subtitle">Sube una imagen o un archivo CSV para realizar la predicción</p>', unsafe_allow_html=True)
 
 # Carga de imagen o CSV
-tab1, tab2 = st.tabs(["CNN: Imágenes DICOM", "Random Forest: CSV Metadata"])
+tab1, tab2, tab3 = st.tabs(["CNN: Imágenes DICOM", "Random Forest: CSV Metadata", "Comparación entre modelos"])
 
 # Subida de imagen
 with tab1:
@@ -179,6 +179,8 @@ with tab1:
                     ax.set_title('Probabilidades de fractura por vértebra (C1-C7)')
                     st.pyplot(fig)
 
+                    
+
 # Tab para CSV con Random Forest
 with tab2:
     csv_file = st.file_uploader("Sube un archivo CSV con metadata", type=["csv"])
@@ -198,7 +200,10 @@ with tab2:
                 
                 # Mostrar las probabilidades para cada vértebra
                 vertebra_labels = [f'C{i+1}' for i in range(7)]
-                prob_df = pd.DataFrame({'Vértebra': vertebra_labels, 'Probabilidad': probs})
+                prob_df = pd.DataFrame({
+                    'Vértebra': vertebra_labels, 
+                    'Probabilidad': probs[0]  # Utiliza la primera fila de predicciones
+                })
                 
                 # Visualizar tabla de probabilidades
                 st.dataframe(prob_df)
@@ -236,3 +241,23 @@ with tab2:
             ax.set_xlabel('Importancia')
             ax.set_title('Importancia de las Características')
             st.pyplot(fig)
+
+with tab3:
+    # Pestaña Comparativa (rendimiento)
+    st.markdown("### Comparación de Rendimiento CNN vs Random Forest")
+
+    metrics = {
+        'Modelo': ['CNN', 'Random Forest'],
+        'Precisión': [0.98, 0.94],  # Valores de ejemplo, reemplazar con los reales
+        'Recall': [0.97, 0.92],
+        'F1-Score': [0.975, 0.93]
+    }
+
+    metrics_df = pd.DataFrame(metrics)
+    st.dataframe(metrics_df)
+
+    fig, ax = plt.subplots()
+    metrics_df.set_index('Modelo').plot(kind='bar', ax=ax)
+    ax.set_ylabel('Valor')
+    ax.set_title('Comparación de Métricas entre Modelos')
+    st.pyplot(fig)
