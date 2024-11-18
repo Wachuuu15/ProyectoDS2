@@ -189,8 +189,50 @@ with tab2:
         
         if st.button('Predecir (Random Forest)'):
             X = preprocess_csv(data)
-            predictions = rf_model.predict(X)
-            st.markdown("### Predicciones de fracturas por vértebra:")
-            for i, pred in enumerate(predictions):
-                st.write(f"Fila {i+1}: {pred}")
-
+            predictions = rf_model.predict_proba(X)  # Asegúrate de usar `predict_proba` si tienes probabilidades
+            
+            st.markdown("### Resultados de Predicción:")
+            
+            for i, probs in enumerate(predictions):
+                st.write(f"Fila {i+1} - Probabilidades de fractura por vértebra:")
+                
+                # Mostrar las probabilidades para cada vértebra
+                vertebra_labels = [f'C{i+1}' for i in range(7)]
+                prob_df = pd.DataFrame({'Vértebra': vertebra_labels, 'Probabilidad': probs})
+                
+                # Visualizar tabla de probabilidades
+                st.dataframe(prob_df)
+                
+                # Gráfico interactivo de las probabilidades
+                fig, ax = plt.subplots()
+                ax.bar(prob_df['Vértebra'], prob_df['Probabilidad'], color='lightcoral')
+                ax.set_xlabel('Vértebras')
+                ax.set_ylabel('Probabilidad')
+                ax.set_title(f'Fila {i+1}: Distribución de Probabilidades')
+                st.pyplot(fig)
+                
+                # Agregar un separador
+                st.markdown("---")
+        
+        # Comparación de Importancia de Características
+        if st.checkbox("Mostrar importancia de características"):
+            st.markdown("### Importancia de las Características en el Modelo Random Forest")
+            
+            # Extraer importancia de las características
+            importances = rf_model.feature_importances_
+            feature_labels = ['Rows', 'Columns', 'SliceThickness', 'SliceRatio',
+                              'ImagePositionPatientX', 'ImagePositionPatientY', 'ImagePositionPatientZ']
+            
+            # Crear DataFrame para visualización
+            importance_df = pd.DataFrame({
+                'Características': feature_labels,
+                'Importancia': importances
+            }).sort_values(by='Importancia', ascending=False)
+            
+            # Mostrar tabla y gráfico
+            st.dataframe(importance_df)
+            fig, ax = plt.subplots()
+            ax.barh(importance_df['Características'], importance_df['Importancia'], color='seagreen')
+            ax.set_xlabel('Importancia')
+            ax.set_title('Importancia de las Características')
+            st.pyplot(fig)
