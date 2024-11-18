@@ -111,6 +111,10 @@ st.markdown(
         font-size: 1.2rem;
         color: #666666;
     }
+    .stMarkdown, .stPlotlyChart, .stPyplot {
+        max-width: 700px; /* Cambia este valor según el ancho deseado */
+        margin: 0 auto;  /* Centrar el contenido */
+    }
     </style>
     """,
     unsafe_allow_html=True
@@ -129,28 +133,51 @@ with tab1:
     if uploaded_file is not None:
         if uploaded_file.name.endswith('.dcm'):
             image = load_dicom(uploaded_file)
-            st.image(image, caption='Imagen DICOM cargada', use_column_width=True)
+            st.image(image, caption='Imagen DICOM cargada', width=500)
         else:
             image = Image.open(uploaded_file)
-            st.image(image, caption='Imagen cargada', use_column_width=True)
+            st.image(image, caption='Imagen cargada', width=500)
         
         if st.button('Predecir (CNN)'):
             processed_image = preprocess_image(image)
             prediction = model.predict(processed_image)[0]
             
-            st.markdown("### Probabilidades de fractura por vértebra (C1-C7):")
-            for i, prob in enumerate(prediction):
-                st.write(f"Vértebra C{i+1}: {prob:.4f}")
-            
-            # Crear la gráfica de porcentajes
-            st.markdown("### Distribución de Probabilidades por Vértebra")
-            fig, ax = plt.subplots()
-            vertebra_labels = [f'C{i+1}' for i in range(7)]
-            ax.bar(vertebra_labels, prediction, color='skyblue')
-            ax.set_xlabel('Vértebras')
-            ax.set_ylabel('Probabilidad')
-            ax.set_title('Probabilidades de fractura por vértebra (C1-C7)')
-            st.pyplot(fig)
+            if all(prob <= 1e-4 for prob in prediction):
+                st.markdown(
+                    """
+                    <h3 style="text-align: center;">Resultados de Predicción</h3>
+                    <p style="text-align: center;">No se detectaron fracturas.</p>
+                    """,
+                    unsafe_allow_html=True,
+                )
+            else:            
+                st.markdown(
+                    """
+                    <h3 style="text-align: center;">Resultados de Predicción</h3>
+                    """,
+                    unsafe_allow_html=True,
+                )
+        
+                # Crear columnas
+                col1, col2 = st.columns(2)
+                
+                # Columna 1: Porcentajes por vértebra
+                with col1:
+                    st.markdown("#### Probabilidades de fractura por vértebra (C1-C7):")
+                    for i, prob in enumerate(prediction):
+                        st.write(f"Vértebra C{i+1}: {prob:.4f}")
+                
+                # Columna 2: Gráfica
+                with col2:
+                    st.markdown("#### Distribución de Probabilidades por Vértebra")
+                    fig, ax = plt.subplots(figsize=(6, 4))  # Ajustar tamaño de la gráfica
+                    vertebra_labels = [f'C{i+1}' for i in range(7)]
+                    ax.bar(vertebra_labels, prediction, color='skyblue')
+                    ax.set_ylim(0, 1)
+                    ax.set_xlabel('Vértebras')
+                    ax.set_ylabel('Probabilidad')
+                    ax.set_title('Probabilidades de fractura por vértebra (C1-C7)')
+                    st.pyplot(fig)
 
 # Tab para CSV con Random Forest
 with tab2:
