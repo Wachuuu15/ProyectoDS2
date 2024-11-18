@@ -1,29 +1,34 @@
 import streamlit as st
+import matplotlib.pyplot as plt
+import pydicom
+import tensorflow as tf
+import tensorflow.keras.layers as tfl
+import keras
+import matplotlib.pyplot as plt
+import io
+import pandas as pd
 import numpy as np
 import cv2
 from tensorflow.keras.models import load_model
 from PIL import Image
-import pydicom
 from tqdm import tqdm
-import tensorflow as tf
-import tensorflow.keras.layers as tfl
 from tensorflow.keras import backend as K
 from sklearn.model_selection import StratifiedKFold
 from tensorflow.keras.preprocessing.image import load_img, img_to_array
 from tensorflow.keras.applications import EfficientNetB0
-import keras
 from keras.models import Sequential
 from keras.layers import Dense, Dropout, Flatten
 from keras.layers import Conv2D, MaxPooling2D
 from keras.utils import to_categorical
 from keras.preprocessing import image
-import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
-import io
+from joblib import load
 
 
 # Cargar el modelo
 model = load_model('modelo_fracturas.h5')
+rf_model = load('random_forest_model.joblib')
+
 
 def preprocess_image(image):
     '''Preprocesar la imagen cargada para el modelo CNN.'''
@@ -34,6 +39,14 @@ def preprocess_image(image):
     return img
 
 
+# Preprocesamiento de datos CSV para Random Forest
+def preprocess_csv(data):
+    #caracteristicas a tomar
+    features = ['Rows', 'Columns', 'SliceThickness', 'SliceRatio',
+                'ImagePositionPatientX', 'ImagePositionPatientY', 'ImagePositionPatientZ']
+    return data[features]
+
+
 def load_dicom(uploaded_file):
     '''Función para cargar y transformar imágenes DICOM desde un archivo en memoria'''
     # Leemos el archivo cargado en bytes
@@ -41,20 +54,18 @@ def load_dicom(uploaded_file):
     dicom_data = pydicom.dcmread(io.BytesIO(file_bytes))  # Leer los datos DICOM desde los bytes
     
     # Obtén el array de píxeles
-    data = dicom_data.pixel_array
+    data = dicom_data.pixel_array   
     
-    # Si la imagen tiene más de 8 bits por píxel, normalizamos a uint8
-    if data.dtype != np.uint8:
-        data = data - np.min(data)  # Escalar valores entre 0 y max
-        data = (data / np.max(data)) * 255  # Normalizar a 255
-        data = data.astype(np.uint8)  # Convertir a uint8
+    # Normalizar la imagen al rango [0, 255] si es necesario
+    data = data.astype(np.float32)
+    data = (data - np.min(data)) / (np.max(data) - np.min(data)) * 255
+    data = data.astype(np.uint8)  # Convertir a uint8
     
     # Si la imagen es en escala de grises (es probable para imágenes médicas)
     if len(data.shape) == 2:  # Imagen 2D, convertir a 3 canales si es necesario
         return cv2.cvtColor(data, cv2.COLOR_GRAY2RGB)
     
     return data
-
 
 def ImgDataGenerator(train_df,base_path):
     '''Function to read dicom image path and store the images as numpy arrays'''
@@ -107,47 +118,52 @@ st.markdown(
 
 
 st.markdown('<p class="title">Detección de Fracturas Cervicales</p>', unsafe_allow_html=True)
-st.markdown('<p class="subtitle">Sube una imagen de tomografía para realizar la predicción.</p>', unsafe_allow_html=True)
+st.markdown('<p class="subtitle">Sube una imagen o un archivo CSV para realizar la predicción</p>', unsafe_allow_html=True)
 
-col1, col2 = st.columns(2)
+# Carga de imagen o CSV
+tab1, tab2 = st.tabs(["CNN: Imágenes DICOM", "Random Forest: CSV Metadata"])
 
 # Subida de imagen
-with col1:
-    uploaded_file = st.file_uploader("", type=["jpg", "png", "jpeg", "dcm"])
+with tab1:
+    uploaded_file = st.file_uploader("Sube una imagen DICOM", type=["jpg", "png", "jpeg", "dcm"])
     if uploaded_file is not None:
         if uploaded_file.name.endswith('.dcm'):
-            # Usar pydicom para leer el archivo DICOM
             image = load_dicom(uploaded_file)
-            st.image(image, caption='Imagen DICOM cargada', use_container_width=True)
+            st.image(image, caption='Imagen DICOM cargada', use_column_width=True)
         else:
-            # Usar PIL para imágenes normales (jpg, png, jpeg, etc.)
             image = Image.open(uploaded_file)
-            st.image(image, caption='Imagen cargada', use_container_width=True)
-
-with col2:
-    if uploaded_file is not None:
-        # Usar un contenedor centrado
-        st.markdown(
-            """
-            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;">
-            """,
-            unsafe_allow_html=True,
-        )
+            st.image(image, caption='Imagen cargada', use_column_width=True)
         
-        if st.button('Predecir'):
+        if st.button('Predecir (CNN)'):
             processed_image = preprocess_image(image)
-            prediction = model.predict(processed_image)
+            prediction = model.predict(processed_image)[0]
             
-            probabilities = prediction[0]
-            threshold = 1e-4
+            st.markdown("### Probabilidades de fractura por vértebra (C1-C7):")
+            for i, prob in enumerate(prediction):
+                st.write(f"Vértebra C{i+1}: {prob:.4f}")
             
-            if all(prob <= threshold for prob in probabilities):
-                st.markdown("### No hay fracturas detectadas.")
-            else:
-                st.markdown("### Probabilidad de fracturas detectadas:")
-                for i, prob in enumerate(probabilities):
-                    if prob > threshold:
-                        st.markdown(f"- **C{i+1}**: {prob:.4f}")
+            # Crear la gráfica de porcentajes
+            st.markdown("### Distribución de Probabilidades por Vértebra")
+            fig, ax = plt.subplots()
+            vertebra_labels = [f'C{i+1}' for i in range(7)]
+            ax.bar(vertebra_labels, prediction, color='skyblue')
+            ax.set_xlabel('Vértebras')
+            ax.set_ylabel('Probabilidad')
+            ax.set_title('Probabilidades de fractura por vértebra (C1-C7)')
+            st.pyplot(fig)
+
+# Tab para CSV con Random Forest
+with tab2:
+    csv_file = st.file_uploader("Sube un archivo CSV con metadata", type=["csv"])
+    if csv_file is not None:
+        data = pd.read_csv(csv_file)
+        st.write("Vista previa de los datos cargados:")
+        st.dataframe(data.head())
         
-        st.markdown("</div>", unsafe_allow_html=True)
+        if st.button('Predecir (Random Forest)'):
+            X = preprocess_csv(data)
+            predictions = rf_model.predict(X)
+            st.markdown("### Predicciones de fracturas por vértebra:")
+            for i, pred in enumerate(predictions):
+                st.write(f"Fila {i+1}: {pred}")
 
